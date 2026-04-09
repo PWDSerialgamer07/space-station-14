@@ -26,6 +26,8 @@ using Robust.Shared.Containers;
 using Robust.Shared.Player;
 using Robust.Shared.Prototypes;
 using System.Linq;
+using Content.Server.Electrocution;
+using Content.Shared.Electrocution;
 
 #region Starlight
 using Content.Server.Atmos.Components;
@@ -78,6 +80,7 @@ public sealed partial class MechSystem : SharedMechSystem
     [Dependency] private readonly IGameTiming Timing = default!;
     [Dependency] private readonly MovementSpeedModifierSystem _movementSpeedModifier = default!;
     [Dependency] private readonly GasTankSystem _gasTank = default!;
+    [Dependency] private readonly ElectrocutionSystem _electrocutionSystem = default!;
 #endregion Starlight
 
 
@@ -112,6 +115,7 @@ public sealed partial class MechSystem : SharedMechSystem
         SubscribeLocalEvent<MechPilotComponent, InhaleLocationEvent>(OnInhale);
         SubscribeLocalEvent<MechPilotComponent, ExhaleLocationEvent>(OnExhale);
         SubscribeLocalEvent<MechPilotComponent, AtmosExposedGetAirEvent>(OnExpose);
+        SubscribeLocalEvent<MechPilotComponent, ElectrocutionAttemptEvent>(OnElectrocutionAttempt); // Starlight
 
         SubscribeLocalEvent<MechAirComponent, MapInitEvent>(OnInitializeAir); // STARLIGHT
 
@@ -159,6 +163,7 @@ public sealed partial class MechSystem : SharedMechSystem
     }
 
     // Starlight-start: fix movement block + Fix UpdateUserInterface
+
 
     private void OnItemRemoved(EntityUid mech, MechComponent mechComp, EntRemovedFromContainerMessage args)
     {
@@ -689,7 +694,7 @@ public sealed partial class MechSystem : SharedMechSystem
         _container.Insert(toInsert, component.BatterySlot);
         component.Energy = _battery.GetCharge(toInsert);
         component.MaxEnergy = battery.MaxCharge;
-        
+
         _movementSpeedModifier.RefreshMovementSpeedModifiers(uid); //Starlight - mech reactors with speed mods
 
         UpdateCanMove(uid, component); // Starlight-edit: fix movement block
@@ -748,7 +753,14 @@ public sealed partial class MechSystem : SharedMechSystem
 
         args.Gas = _atmosphere.GetContainingMixture(component.Mech); // STARLIGHT
     }
+    static void OnElectrocutionAttempt(EntityUid uid, MechPilotComponent component, ref ElectrocutionAttemptEvent args)
+    {
+        // Starlight
+        // Intercepts **any** electrical damage aimed at the pilot(that isn't already intercepted by the mech), and tanks it.
+        // Meant to patch the bug where punching a powered grill would shock) you inside a mech
+         args.SiemensCoefficient = 0f;
 
+    }
     private void OnExpose(EntityUid uid, MechPilotComponent component, ref AtmosExposedGetAirEvent args)
     {
         if (args.Handled)
